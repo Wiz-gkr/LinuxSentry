@@ -1,10 +1,15 @@
 # 🛡️ LinuxSentry
 
-### Lightweight Linux Security Auditing & Enumeration Tool
+![Python](https://img.shields.io/badge/Python-3.x-blue?style=for-the-badge&logo=python)
+![Platform](https://img.shields.io/badge/Platform-Linux-orange?style=for-the-badge&logo=linux)
+![Status](https://img.shields.io/badge/Status-Active-success?style=for-the-badge)
+![Security](https://img.shields.io/badge/Focus-Linux%20Security-red?style=for-the-badge)
 
-LinuxSentry is a Python-based Linux security auditing tool designed to automate basic system enumeration and identify potentially risky configurations.
+> 🛡️ A lightweight Python-based tool for Linux security auditing, enumeration, and basic misconfiguration detection.
 
-It performs checks for system information, network configuration, listening ports, SUID binaries, world-writable files, and orphaned files.
+LinuxSentry is a modular Python tool designed to automate basic Linux security checks and help identify potentially risky system configurations.
+
+It performs system and network enumeration, detects listening ports, audits SUID binaries, identifies world-writable files, checks for orphaned files, and provides a simple security score with an overall risk level.
 
 ---
 
@@ -22,8 +27,9 @@ It performs checks for system information, network configuration, listening port
 - 🚨 Overall risk level assessment
 - 🎨 Colored terminal output
 - 📄 Export scan results to a text report
-- ⚡ Modular Python architecture
 - ⏱️ Scan duration tracking
+- ⚡ Modular Python architecture
+- 🖥️ Command-line interface with `argparse`
 
 ---
 
@@ -34,11 +40,12 @@ LinuxSentry/
 │
 ├── audit.py
 ├── README.md
+├── .gitignore
 │
 └── modules/
     ├── __init__.py
-    ├── system.py
+    ├── analyzer.py
     ├── network.py
     ├── permissions.py
-    ├── analyzer.py
+    ├── system.py
     └── ui.py
