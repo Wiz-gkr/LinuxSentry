@@ -11,6 +11,7 @@ from modules.permissions import (
 )
 from modules.persistence import persistence_enumeration
 from modules.processes import processes_scan
+from modules.service_analyzer import service_security_analysis
 from modules.ui import (
     info,
     success,
@@ -205,6 +206,12 @@ def main():
     )
 
     parser.add_argument(
+        "--service-analysis",
+        action="store_true",
+        help="Analyze running services for security issues"
+    )
+
+    parser.add_argument(
         "--all",
         action="store_true",
         help="Run all security checks"
@@ -218,7 +225,10 @@ def main():
 
     args = parser.parse_args()
 
-    # Check whether at least one scan option was selected
+    # ---------------------------------------------------------
+    # ARGUMENT VALIDATION
+    # ---------------------------------------------------------
+
     if not any([
         args.system,
         args.network,
@@ -226,6 +236,7 @@ def main():
         args.permissions,
         args.persistence,
         args.processes,
+        args.service_analysis,
         args.all
     ]):
         print(banner())
@@ -301,20 +312,6 @@ def main():
 
         all_findings.extend(findings)
 
-        summary = findings_summary(all_findings)
-
-        print(summary)
-        results.append(summary)
-
-        score_display = security_score_display(
-            all_findings
-        )
-
-        print(score_display)
-        results.append(score_display)
-
-        print_colored_risk_level(all_findings)
-
     # ---------------------------------------------------------
     # CRON & PERSISTENCE CHECKS
     # ---------------------------------------------------------
@@ -352,24 +349,44 @@ def main():
         results.append(result)
 
     # ---------------------------------------------------------
+    # SERVICE SECURITY ANALYSIS
+    # ---------------------------------------------------------
+
+    if args.service_analysis or args.all:
+        print(info(
+            "Running service security analysis..."
+        ))
+
+        result, findings = service_security_analysis()
+
+        print(result)
+        results.append(result)
+
+        if findings:
+            print("\n[+] SERVICE SECURITY FINDINGS")
+            print("-" * 60)
+
+            print_colored_findings(findings)
+
+            all_findings.extend(findings)
+
+    # ---------------------------------------------------------
     # FINAL SECURITY SUMMARY
     # ---------------------------------------------------------
 
-    # Display one final score after all selected scans
-    if all_findings:
-        final_summary = findings_summary(all_findings)
+    summary = findings_summary(all_findings)
 
-        print(final_summary)
-        results.append(final_summary)
+    print(summary)
+    results.append(summary)
 
-        final_score = security_score_display(
-            all_findings
-        )
+    score_display = security_score_display(
+        all_findings
+    )
 
-        print(final_score)
-        results.append(final_score)
+    print(score_display)
+    results.append(score_display)
 
-        print_colored_risk_level(all_findings)
+    print_colored_risk_level(all_findings)
 
     # ---------------------------------------------------------
     # SCAN COMPLETION
