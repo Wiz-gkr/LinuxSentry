@@ -9,6 +9,7 @@ from modules.permissions import (
     world_writable_enumeration,
     orphaned_files_enumeration
 )
+from modules.persistence import persistence_enumeration
 from modules.ui import (
     info,
     success,
@@ -190,6 +191,12 @@ def main():
     )
 
     parser.add_argument(
+        "--persistence",
+        action="store_true",
+        help="Run cron and persistence checks"
+    )
+
+    parser.add_argument(
         "--all",
         action="store_true",
         help="Run all security checks"
@@ -208,6 +215,7 @@ def main():
         args.network,
         args.ports,
         args.permissions,
+        args.persistence,
         args.all
     ]):
         print(banner())
@@ -220,12 +228,20 @@ def main():
     print(banner())
     results.append(banner())
 
+    # ---------------------------------------------------------
+    # SYSTEM SCAN
+    # ---------------------------------------------------------
+
     if args.system or args.all:
         print(info("Running system information scan..."))
 
         result = system_info()
         print(result)
         results.append(result)
+
+    # ---------------------------------------------------------
+    # NETWORK SCAN
+    # ---------------------------------------------------------
 
     if args.network or args.all:
         print(info("Running network interface scan..."))
@@ -234,12 +250,20 @@ def main():
         print(result)
         results.append(result)
 
+    # ---------------------------------------------------------
+    # LISTENING PORTS
+    # ---------------------------------------------------------
+
     if args.ports or args.all:
         print(info("Checking listening ports..."))
 
         result = listening_ports()
         print(result)
         results.append(result)
+
+    # ---------------------------------------------------------
+    # PERMISSION SECURITY CHECKS
+    # ---------------------------------------------------------
 
     if args.permissions or args.all:
         print(info(
@@ -270,6 +294,44 @@ def main():
 
         print_colored_risk_level(all_findings)
 
+    # ---------------------------------------------------------
+    # CRON & PERSISTENCE CHECKS
+    # ---------------------------------------------------------
+
+    if args.persistence or args.all:
+        print(info(
+            "Running cron and persistence checks..."
+        ))
+
+        result, findings = persistence_enumeration()
+
+        print(result)
+        results.append(result)
+
+        if findings:
+            print("\n[+] PERSISTENCE SECURITY FINDINGS")
+            print("-" * 60)
+
+            print_colored_findings(findings)
+
+            all_findings.extend(findings)
+
+            summary = findings_summary(all_findings)
+            print(summary)
+            results.append(summary)
+
+            score_display = security_score_display(
+                all_findings
+            )
+            print(score_display)
+            results.append(score_display)
+
+            print_colored_risk_level(all_findings)
+
+    # ---------------------------------------------------------
+    # SCAN COMPLETION
+    # ---------------------------------------------------------
+
     duration = time.time() - start_time
 
     completion = (
@@ -284,6 +346,10 @@ def main():
     print(success("All selected scans completed."))
 
     results.append(completion)
+
+    # ---------------------------------------------------------
+    # REPORT OUTPUT
+    # ---------------------------------------------------------
 
     if args.output:
         save_report(
