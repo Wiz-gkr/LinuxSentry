@@ -25,6 +25,17 @@ NORMAL_WORLD_WRITABLE = [
 def analyze_suid(files):
     findings = []
 
+    common_suid = [
+        "/usr/sbin/mount.cifs",
+        "/usr/sbin/mount.nfs",
+        "/usr/sbin/pppd",
+        "/usr/bin/ntfs-3g",
+        "/usr/bin/fusermount3",
+        "/usr/lib/openssh/ssh-keysign",
+        "/usr/lib/dbus-1.0/dbus-daemon-launch-helper",
+        "/usr/lib/xorg/Xorg.wrap",
+    ]
+
     for file in files:
 
         if file in KNOWN_SYSTEM_SUID:
@@ -32,10 +43,52 @@ def analyze_suid(files):
                 Finding(
                     severity="LOW",
                     category="SUID Security",
-                    message=f"Known SUID binary: {file}",
+                    message=f"Expected system SUID binary: {file}",
                     recommendation=(
-                        "Verify that this system binary requires "
-                        "SUID privileges."
+                        "Verify that SUID privileges are required "
+                        "for this system binary."
+                    ),
+                    confidence="HIGH"
+                )
+            )
+
+        elif file in common_suid:
+            findings.append(
+                Finding(
+                    severity="LOW",
+                    category="SUID Security",
+                    message=f"Common SUID binary detected: {file}",
+                    recommendation=(
+                        "Verify that the package and SUID permission "
+                        "are expected on this system."
+                    ),
+                    confidence="MEDIUM"
+                )
+            )
+
+        elif file.startswith("/snap/"):
+            findings.append(
+                Finding(
+                    severity="LOW",
+                    category="SUID Security",
+                    message=f"Snap-managed SUID binary: {file}",
+                    recommendation=(
+                        "Verify that the SUID permission belongs "
+                        "to the installed Snap package."
+                    ),
+                    confidence="MEDIUM"
+                )
+            )
+
+        elif "/kismet_cap_" in file:
+            findings.append(
+                Finding(
+                    severity="LOW",
+                    category="SUID Security",
+                    message=f"Kismet capture helper: {file}",
+                    recommendation=(
+                        "Verify that the Kismet capture helper "
+                        "is required and comes from a trusted package."
                     ),
                     confidence="HIGH"
                 )
@@ -46,10 +99,11 @@ def analyze_suid(files):
                 Finding(
                     severity="MEDIUM",
                     category="SUID Security",
-                    message=f"Review unusual SUID binary: {file}",
+                    message=f"Unrecognized SUID binary: {file}",
                     recommendation=(
-                        "Investigate the binary and verify whether "
-                        "SUID privileges are required."
+                        "Identify the owning package, verify the "
+                        "binary's purpose, and confirm that SUID "
+                        "privileges are required."
                     ),
                     confidence="MEDIUM"
                 )
@@ -68,12 +122,10 @@ def analyze_world_writable(items):
                 Finding(
                     severity="LOW",
                     category="File Permissions",
-                    message=(
-                        f"Expected world-writable directory: {item}"
-                    ),
+                    message=f"Expected world-writable directory: {item}",
                     recommendation=(
-                        "No immediate action required, but verify "
-                        "that the directory permissions are intentional."
+                        "Verify that the directory permissions "
+                        "are intentional."
                     ),
                     confidence="HIGH"
                 )
@@ -86,8 +138,8 @@ def analyze_world_writable(items):
                     category="File Permissions",
                     message=f"Review world-writable item: {item}",
                     recommendation=(
-                        "Check whether world-write permissions are "
-                        "required and remove them if unnecessary."
+                        "Check whether world-write permissions "
+                        "are required and remove them if unnecessary."
                     ),
                     confidence="HIGH"
                 )
@@ -100,7 +152,6 @@ def analyze_orphaned(files):
     findings = []
 
     for file in files:
-
         findings.append(
             Finding(
                 severity="MEDIUM",
