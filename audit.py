@@ -10,6 +10,7 @@ from modules.permissions import (
     orphaned_files_enumeration
 )
 from modules.persistence import persistence_enumeration
+from modules.processes import processes_scan
 from modules.ui import (
     info,
     success,
@@ -141,6 +142,7 @@ def save_report(filename, content, duration):
                 f"Generated : "
                 f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
             )
+
             file.write(f"Scan Time : {duration:.2f} seconds\n")
 
             file.write("\n" + "=" * 60 + "\n")
@@ -197,6 +199,12 @@ def main():
     )
 
     parser.add_argument(
+        "--processes",
+        action="store_true",
+        help="Run process and service enumeration"
+    )
+
+    parser.add_argument(
         "--all",
         action="store_true",
         help="Run all security checks"
@@ -210,12 +218,14 @@ def main():
 
     args = parser.parse_args()
 
+    # Check whether at least one scan option was selected
     if not any([
         args.system,
         args.network,
         args.ports,
         args.permissions,
         args.persistence,
+        args.processes,
         args.all
     ]):
         print(banner())
@@ -233,9 +243,12 @@ def main():
     # ---------------------------------------------------------
 
     if args.system or args.all:
-        print(info("Running system information scan..."))
+        print(info(
+            "Running system information scan..."
+        ))
 
         result = system_info()
+
         print(result)
         results.append(result)
 
@@ -244,9 +257,12 @@ def main():
     # ---------------------------------------------------------
 
     if args.network or args.all:
-        print(info("Running network interface scan..."))
+        print(info(
+            "Running network interface scan..."
+        ))
 
         result = network_info()
+
         print(result)
         results.append(result)
 
@@ -255,9 +271,12 @@ def main():
     # ---------------------------------------------------------
 
     if args.ports or args.all:
-        print(info("Checking listening ports..."))
+        print(info(
+            "Checking listening ports..."
+        ))
 
         result = listening_ports()
+
         print(result)
         results.append(result)
 
@@ -283,12 +302,14 @@ def main():
         all_findings.extend(findings)
 
         summary = findings_summary(all_findings)
+
         print(summary)
         results.append(summary)
 
         score_display = security_score_display(
             all_findings
         )
+
         print(score_display)
         results.append(score_display)
 
@@ -316,17 +337,39 @@ def main():
 
             all_findings.extend(findings)
 
-            summary = findings_summary(all_findings)
-            print(summary)
-            results.append(summary)
+    # ---------------------------------------------------------
+    # PROCESS & SERVICE ENUMERATION
+    # ---------------------------------------------------------
 
-            score_display = security_score_display(
-                all_findings
-            )
-            print(score_display)
-            results.append(score_display)
+    if args.processes or args.all:
+        print(info(
+            "Running process and service enumeration..."
+        ))
 
-            print_colored_risk_level(all_findings)
+        result = processes_scan()
+
+        print(result)
+        results.append(result)
+
+    # ---------------------------------------------------------
+    # FINAL SECURITY SUMMARY
+    # ---------------------------------------------------------
+
+    # Display one final score after all selected scans
+    if all_findings:
+        final_summary = findings_summary(all_findings)
+
+        print(final_summary)
+        results.append(final_summary)
+
+        final_score = security_score_display(
+            all_findings
+        )
+
+        print(final_score)
+        results.append(final_score)
+
+        print_colored_risk_level(all_findings)
 
     # ---------------------------------------------------------
     # SCAN COMPLETION
@@ -343,7 +386,10 @@ def main():
     )
 
     print(completion)
-    print(success("All selected scans completed."))
+
+    print(success(
+        "All selected scans completed."
+    ))
 
     results.append(completion)
 
