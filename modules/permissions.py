@@ -10,8 +10,17 @@ from modules.analyzer import (
 def format_findings(findings):
     output = []
 
-    for severity, message in findings:
-        output.append(f"[{severity}] {message}")
+    for finding in findings:
+        # Support the existing (severity, message) format
+        if isinstance(finding, tuple):
+            severity, message = finding
+            output.append(f"[{severity}] {message}")
+
+        # Support the new Finding object
+        else:
+            severity = getattr(finding, "severity", "LOW")
+            message = getattr(finding, "message", str(finding))
+            output.append(f"[{severity}] {message}")
 
     return output
 

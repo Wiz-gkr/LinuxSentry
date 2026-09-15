@@ -12,6 +12,7 @@ from modules.permissions import (
 from modules.persistence import persistence_enumeration
 from modules.processes import processes_scan
 from modules.service_analyzer import service_security_analysis
+from modules.findings import Finding
 from modules.ui import (
     info,
     success,
@@ -49,12 +50,46 @@ def permissions_scan():
     return "\n".join(results), all_findings
 
 
+def finding_values(finding):
+    """
+    Support both the new Finding object and the
+    older (severity, message) tuple format.
+    """
+
+    if isinstance(finding, Finding):
+        return (
+            finding.severity,
+            finding.message,
+            finding.confidence
+        )
+
+    if isinstance(finding, tuple):
+        severity = finding[0]
+        message = finding[1]
+
+        return (
+            severity,
+            message,
+            "MEDIUM"
+        )
+
+    return (
+        "LOW",
+        str(finding),
+        "LOW"
+    )
+
+
 def findings_summary(findings):
     low_count = 0
     medium_count = 0
     high_count = 0
 
-    for severity, message in findings:
+    for finding in findings:
+        severity, message, confidence = finding_values(
+            finding
+        )
+
         if severity == "LOW":
             low_count += 1
         elif severity == "MEDIUM":
@@ -76,15 +111,36 @@ def findings_summary(findings):
 def calculate_security_score(findings):
     score = 100
 
-    for severity, message in findings:
-        if severity == "LOW":
-            score -= 2
-        elif severity == "MEDIUM":
-            score -= 5
-        elif severity == "HIGH":
-            score -= 10
+    severity_points = {
+        "LOW": 2,
+        "MEDIUM": 5,
+        "HIGH": 10
+    }
 
-    score = max(score, 0)
+    confidence_multiplier = {
+        "LOW": 0.5,
+        "MEDIUM": 1.0,
+        "HIGH": 1.25
+    }
+
+    for finding in findings:
+        severity, message, confidence = finding_values(
+            finding
+        )
+
+        deduction = severity_points.get(
+            severity,
+            0
+        )
+
+        multiplier = confidence_multiplier.get(
+            confidence,
+            1.0
+        )
+
+        score -= deduction * multiplier
+
+    score = max(0, round(score))
 
     if score >= 80:
         risk_level = "LOW"
@@ -97,7 +153,9 @@ def calculate_security_score(findings):
 
 
 def security_score_display(findings):
-    score, risk_level = calculate_security_score(findings)
+    score, risk_level = calculate_security_score(
+        findings
+    )
 
     return (
         "\n"
@@ -110,33 +168,77 @@ def security_score_display(findings):
 
 
 def print_colored_findings(findings):
-    for severity, message in findings:
+    for finding in findings:
+
+        severity, message, confidence = finding_values(
+            finding
+        )
+
         if severity == "LOW":
             print(low(message))
+
         elif severity == "MEDIUM":
             print(medium(message))
+
         elif severity == "HIGH":
             print(high(message))
 
 
+def print_detailed_findings(findings):
+    """
+    Display normalized Finding objects with their
+    category, confidence and recommendation.
+    """
+
+    for finding in findings:
+
+        if isinstance(finding, Finding):
+            print(f"\n{finding}")
+
+        else:
+            severity, message, confidence = finding_values(
+                finding
+            )
+
+            print(
+                f"\n[{severity}] Security Finding\n"
+                f"  Finding      : {message}\n"
+                f"  Confidence   : {confidence}\n"
+                f"  Recommendation: Review this finding."
+            )
+
+
 def print_colored_risk_level(findings):
-    score, risk_level = calculate_security_score(findings)
+    score, risk_level = calculate_security_score(
+        findings
+    )
 
     print("\n[+] OVERALL RISK LEVEL")
 
     if risk_level == "LOW":
-        print(low(f"Risk Level: {risk_level} ({score}/100)"))
+        print(low(
+            f"Risk Level: {risk_level} ({score}/100)"
+        ))
+
     elif risk_level == "MEDIUM":
-        print(medium(f"Risk Level: {risk_level} ({score}/100)"))
+        print(medium(
+            f"Risk Level: {risk_level} ({score}/100)"
+        ))
+
     else:
-        print(high(f"Risk Level: {risk_level} ({score}/100)"))
+        print(high(
+            f"Risk Level: {risk_level} ({score}/100)"
+        ))
 
 
 def save_report(filename, content, duration):
     try:
         with open(filename, "w") as file:
+
             file.write("=" * 60 + "\n")
-            file.write("          LinuxSentry Security Audit Report\n")
+            file.write(
+                "          LinuxSentry Security Audit Report\n"
+            )
             file.write("=" * 60 + "\n\n")
 
             file.write(
@@ -144,7 +246,9 @@ def save_report(filename, content, duration):
                 f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
             )
 
-            file.write(f"Scan Time : {duration:.2f} seconds\n")
+            file.write(
+                f"Scan Time : {duration:.2f} seconds\n"
+            )
 
             file.write("\n" + "=" * 60 + "\n")
             file.write("                    RESULTS\n")
@@ -163,6 +267,7 @@ def save_report(filename, content, duration):
 
 
 def main():
+
     start_time = time.time()
 
     parser = argparse.ArgumentParser(
@@ -225,10 +330,6 @@ def main():
 
     args = parser.parse_args()
 
-    # ---------------------------------------------------------
-    # ARGUMENT VALIDATION
-    # ---------------------------------------------------------
-
     if not any([
         args.system,
         args.network,
@@ -239,6 +340,7 @@ def main():
         args.service_analysis,
         args.all
     ]):
+
         print(banner())
         parser.print_help()
         return
@@ -250,10 +352,11 @@ def main():
     results.append(banner())
 
     # ---------------------------------------------------------
-    # SYSTEM SCAN
+    # SYSTEM
     # ---------------------------------------------------------
 
     if args.system or args.all:
+
         print(info(
             "Running system information scan..."
         ))
@@ -264,10 +367,11 @@ def main():
         results.append(result)
 
     # ---------------------------------------------------------
-    # NETWORK SCAN
+    # NETWORK
     # ---------------------------------------------------------
 
     if args.network or args.all:
+
         print(info(
             "Running network interface scan..."
         ))
@@ -278,10 +382,11 @@ def main():
         results.append(result)
 
     # ---------------------------------------------------------
-    # LISTENING PORTS
+    # PORTS
     # ---------------------------------------------------------
 
     if args.ports or args.all:
+
         print(info(
             "Checking listening ports..."
         ))
@@ -292,10 +397,11 @@ def main():
         results.append(result)
 
     # ---------------------------------------------------------
-    # PERMISSION SECURITY CHECKS
+    # PERMISSIONS
     # ---------------------------------------------------------
 
     if args.permissions or args.all:
+
         print(info(
             "Running permission security checks..."
         ))
@@ -305,7 +411,7 @@ def main():
         print(result)
         results.append(result)
 
-        print("\n[+] COLORED SECURITY FINDINGS")
+        print("\n[+] SECURITY FINDINGS")
         print("-" * 60)
 
         print_colored_findings(findings)
@@ -313,10 +419,11 @@ def main():
         all_findings.extend(findings)
 
     # ---------------------------------------------------------
-    # CRON & PERSISTENCE CHECKS
+    # PERSISTENCE
     # ---------------------------------------------------------
 
     if args.persistence or args.all:
+
         print(info(
             "Running cron and persistence checks..."
         ))
@@ -327,7 +434,8 @@ def main():
         results.append(result)
 
         if findings:
-            print("\n[+] PERSISTENCE SECURITY FINDINGS")
+
+            print("\n[+] PERSISTENCE FINDINGS")
             print("-" * 60)
 
             print_colored_findings(findings)
@@ -335,10 +443,11 @@ def main():
             all_findings.extend(findings)
 
     # ---------------------------------------------------------
-    # PROCESS & SERVICE ENUMERATION
+    # PROCESSES
     # ---------------------------------------------------------
 
     if args.processes or args.all:
+
         print(info(
             "Running process and service enumeration..."
         ))
@@ -349,10 +458,11 @@ def main():
         results.append(result)
 
     # ---------------------------------------------------------
-    # SERVICE SECURITY ANALYSIS
+    # SERVICE ANALYSIS
     # ---------------------------------------------------------
 
     if args.service_analysis or args.all:
+
         print(info(
             "Running service security analysis..."
         ))
@@ -363,6 +473,7 @@ def main():
         results.append(result)
 
         if findings:
+
             print("\n[+] SERVICE SECURITY FINDINGS")
             print("-" * 60)
 
@@ -371,10 +482,24 @@ def main():
             all_findings.extend(findings)
 
     # ---------------------------------------------------------
-    # FINAL SECURITY SUMMARY
+    # FINAL FINDINGS
     # ---------------------------------------------------------
 
-    summary = findings_summary(all_findings)
+    print("\n[+] DETAILED SECURITY FINDINGS")
+    print("-" * 60)
+
+    if all_findings:
+        print_detailed_findings(all_findings)
+    else:
+        print("No security findings detected.")
+
+    # ---------------------------------------------------------
+    # FINAL SUMMARY
+    # ---------------------------------------------------------
+
+    summary = findings_summary(
+        all_findings
+    )
 
     print(summary)
     results.append(summary)
@@ -386,10 +511,12 @@ def main():
     print(score_display)
     results.append(score_display)
 
-    print_colored_risk_level(all_findings)
+    print_colored_risk_level(
+        all_findings
+    )
 
     # ---------------------------------------------------------
-    # SCAN COMPLETION
+    # COMPLETION
     # ---------------------------------------------------------
 
     duration = time.time() - start_time
@@ -411,10 +538,11 @@ def main():
     results.append(completion)
 
     # ---------------------------------------------------------
-    # REPORT OUTPUT
+    # REPORT
     # ---------------------------------------------------------
 
     if args.output:
+
         save_report(
             args.output,
             "\n\n".join(results),
